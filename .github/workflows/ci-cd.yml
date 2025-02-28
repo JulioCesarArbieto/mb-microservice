@@ -1,0 +1,52 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+      
+      - name: Configurar JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      
+      - name: Compilar la aplicación
+        run: mvn clean package
+      
+      - name: Ejecutar pruebas
+        run: mvn test
+  
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+      
+      - name: Login en Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      - name: Construcción y push de imagen a ACR
+        run: |
+          az acr login --name mibancoacr
+          docker build -t mibancoacr.azurecr.io/mibanco-app:latest .
+          docker push mibancoacr.azurecr.io/mibanco-app:latest
+      
+      - name: Desplegar en AKS
+        run: |
+          az aks get-credentials --resource-group mibanco-rg --name mibanco-aks
+          kubectl apply -f k8s/
