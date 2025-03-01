@@ -8,8 +8,8 @@ Este repositorio contiene una implementación de CI/CD utilizando GitHub Actions
 Si aún no tienes un repositorio, crea uno en [GitHub](https://github.com/) y clónalo en tu máquina local:
 
 ```bash
-git clone https://github.com/tu-usuario/tu-repo.git
-cd tu-repo
+git clone https://github.com/JulioCesarArbieto/mb-microservice.git
+cd mb-microservice
 ```
 
 ## 2. Crear la aplicación en Java
@@ -17,13 +17,13 @@ cd tu-repo
 Crea una aplicación simple en Java con Spring Boot:
 
 ```bash
-curl https://start.spring.io/starter.zip -d dependencies=web -d type=maven-project -d language=java -o app.zip
-unzip app.zip -d app
-cd app
+curl https://start.spring.io/starter.zip -d dependencies=web -d type=maven-project -d language=java -o mb-microservice.zip
+unzip mb-microservice.zip -d mb-microservice
+cd mb-microservice
 mvn package
 ```
 
-Edita `src/main/java/com/example/demo/DemoApplication.java` para que devuelva "Hola Mibanco":
+Edita `src/main/java/com/mibanco/mbmicroservice/HelloController.java` para que devuelva "Hola Mibanco":
 
 ```java
 @RestController
@@ -42,6 +42,10 @@ Crea un directorio `infra` y dentro, el archivo `main.tf` con la configuración 
 ```terraform
 provider "azurerm" {
   features {}
+  subscription_id = "xxxxxx"
+  client_id       = "xxxxxx"
+  client_secret   = "xxxxxx"
+  tenant_id       = "xxxxxx"
 }
 
 resource "azurerm_resource_group" "rg" {
@@ -57,7 +61,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
 
   default_node_pool {
     name       = "default"
-    node_count = 2
+    node_count = 1
     vm_size    = "Standard_DS2_v2"
   }
 
@@ -73,6 +77,61 @@ resource "azurerm_container_registry" "acr" {
   sku                 = "Basic"
   admin_enabled       = true
 }
+
+# Azure API Management
+resource "azurerm_api_management" "apim" {
+  name                = "mibanco-apim"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  publisher_name      = "Mibanco"
+  publisher_email     = "admin@mibanco.com"
+  sku_name            = "Consumption_0"
+}
+
+resource "azurerm_api_management_api" "api" {
+  name                = "mibanco-api"
+  resource_group_name = azurerm_resource_group.rg.name
+  api_management_name = azurerm_api_management.apim.name
+  revision            = "1"
+  display_name        = "Mibanco API"
+  path                = "mibanco"
+  protocols           = ["https"]
+  service_url         = "https://${azurerm_api_management.apim.gateway_url}"
+}
+
+resource "azurerm_api_management_api_operation" "get_hello" {
+  operation_id        = "get-hello"
+  api_name            = azurerm_api_management_api.api.name
+  api_management_name = azurerm_api_management.apim.name
+  resource_group_name = azurerm_resource_group.rg.name
+  display_name        = "Get Hello"
+  method              = "GET"
+  url_template        = "/"
+  response {
+    status_code  = 200
+    description = "OK"
+  }
+}
+
+resource "azurerm_api_management_api_policy" "policy" {
+  api_name            = azurerm_api_management_api.api.name
+  api_management_name = azurerm_api_management.apim.name
+  resource_group_name = azurerm_resource_group.rg.name
+
+  xml_content = <<XML
+<policies>
+    <inbound>
+        <base />
+    </inbound>
+    <backend>
+        <base />
+    </backend>
+    <outbound>
+        <base />
+    </outbound>
+</policies>
+XML
+}
 ```
 
 Inicializa Terraform y aplica los cambios:
@@ -81,6 +140,7 @@ Inicializa Terraform y aplica los cambios:
 cd infra
 terraform init
 terraform apply -auto-approve
+terraform destroy -auto-approve
 ```
 
 ## 4. Configurar GitHub Actions para CI/CD
@@ -129,6 +189,13 @@ jobs:
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      #- name: Azure login
+      #  uses: azure/login@v2
+      #  with:
+      #    client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      #    tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      #    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       
       - name: Construcción y push de imagen a ACR
         run: |
@@ -151,22 +218,27 @@ Crea los siguientes archivos dentro de `k8s/`:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mibanco-app
+  name: mbmicroservice
+  labels:
+    app: mbmicroservice
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: mibanco-app
+      app: mbmicroservice
   template:
     metadata:
       labels:
-        app: mibanco-app
+        app: mbmicroservice
     spec:
       containers:
-      - name: mibanco-app
-        image: mibancoacr.azurecr.io/mibanco-app:latest
+      - name: mbmicroservice
+        image: mibancoacr.azurecr.io/mbmicroservice:latest # Cambiar según la imagen
         ports:
         - containerPort: 8080
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "prod" # Cambiar según el ambiente
 ```
 
 **Service (`service.yml`)**:
@@ -174,15 +246,15 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: mibanco-service
+  name: mbmicroservice-service
 spec:
   selector:
-    app: mibanco-app
+    app: mbmicroservice
   ports:
     - protocol: TCP
       port: 80
       targetPort: 8080
-  type: LoadBalancer
+  type: LoadBalancer # Cambiar a ClusterIP si se usará Ingress
 ```
 
 **Ingress (`ingress.yml`)**:
@@ -190,19 +262,21 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: mibanco-ingress
+  name: mbmicroservice-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
 spec:
   rules:
-    - host: mibanco.local
-      http:
-        paths:
-        - path: /
-          pathType: Prefix
-          backend:
-            service:
-              name: mibanco-service
-              port:
-                number: 80
+  - host: mbmicroservice.mibanco.com # Cambiar por el dominio real
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: mbmicroservice-service
+            port:
+              number: 80
 ```
 
 ## 6. Validación del despliegue
@@ -217,7 +291,7 @@ kubectl get ingress
 Prueba la aplicación con Postman o `curl`:
 
 ```bash
-curl http://mibanco.local
+curl https://${azurerm_api_management.apim.gateway_url}/mibanco
 ```
 
 Con este flujo, hemos automatizado la infraestructura y el despliegue de la aplicación en Azure. 🚀

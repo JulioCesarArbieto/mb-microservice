@@ -1,0 +1,17 @@
+az aks get-credentials --resource-group mibanco-rg --name mibanco-aks
+
+PASO 1:
+----------------------
+cd infra
+terraform init
+terraform plan
+terraform apply -auto-approve
+
+PASO 2:
+----------------------
+Ejecutar el pipeline Action
+
+
+PASO 3:
+----------------------
+terraform destroy -auto-approve
