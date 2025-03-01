@@ -32,8 +32,7 @@ build/
 ### VS Code ###
 .vscode/
 "terraform.tfvars" 
-/infra/.terraform/
 /infra/.terraform.lock.hcl
-/infra/.terraform/providers/registry.terraform.io/hashicorp/azurerm/4.21.1/windows_386/LICENSE.txt
-/infra/.terraform/providers/registry.terraform.io/hashicorp/azurerm/4.21.1/windows_386/terraform-provider-azurerm_v4.21.1_x5.exe
-".terraform/"
+/infra/.terraform/
+infra/terraform.tfstate
+infra/terraform.tfstate.backup
