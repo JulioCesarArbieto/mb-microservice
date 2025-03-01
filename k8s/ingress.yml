@@ -1,18 +1,16 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: mbmicroservice-ingress
-  annotations:
-    kubernetes.io/ingress.class: "nginx"
+  name: mibanco-ingress
 spec:
   rules:
-  - host: mbmicroservice.mibanco.com # Cambiar por el dominio real
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: mbmicroservice-service
-            port:
-              number: 80
+    - host: mibanco.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mibanco-service
+                port:
+                  number: 80

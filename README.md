@@ -139,6 +139,7 @@ Inicializa Terraform y aplica los cambios:
 ```bash
 cd infra
 terraform init
+terraform plan
 terraform apply -auto-approve
 terraform destroy -auto-approve
 ```
