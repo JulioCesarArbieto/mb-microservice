@@ -1,6 +1,6 @@
 # Usa una imagen ligera de OpenJDK 17
-FROM openjdk:17-alpine 
-#FROM openjdk:17-jdk-slim
+#FROM openjdk:17-alpine 
+FROM openjdk:17-jdk-slim
 # Establece el directorio de trabajo dentro del contenedor
 WORKDIR /app
 # Copia el JAR generado en la carpeta target al contenedor
