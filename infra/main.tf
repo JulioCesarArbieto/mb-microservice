@@ -1,14 +1,14 @@
 provider "azurerm" {
   features {}
-  #subscription_id = "xxx"
-  #client_id       = "xxx"
-  #client_secret   = "xxx"
-  #tenant_id       = "xxx"
+  subscription_id = var.subscription_id
+  client_id       = var.client_id
+  client_secret   = var.client_secret
+  tenant_id       = var.tenant_id
 }
 
 resource "azurerm_resource_group" "rg" {
-  name     = "mibanco-rg"
-  location = "East US"
+  name     = var.resource_group_name
+  location = var.location
 }
 
 resource "azurerm_kubernetes_cluster" "aks" {
@@ -19,8 +19,8 @@ resource "azurerm_kubernetes_cluster" "aks" {
 
   default_node_pool {
     name       = "default"
-    node_count = 1
-    vm_size    = "Standard_DS2_v2"
+    node_count = var.aks_node_count
+    vm_size    = var.aks_vm_size
   }
 
   identity {
@@ -46,47 +46,13 @@ resource "azurerm_api_management" "apim" {
   sku_name            = "Consumption_0"
 }
 
-resource "azurerm_api_management_api" "api" {
-  name                = "mibanco-api"
-  resource_group_name = azurerm_resource_group.rg.name
-  api_management_name = azurerm_api_management.apim.name
-  revision            = "1"
-  display_name        = "Mibanco API"
-  path                = "mibanco"
-  protocols           = ["https"]
-  service_url         = "https://${azurerm_api_management.apim.gateway_url}"
-}
-
-resource "azurerm_api_management_api_operation" "get_hello" {
-  operation_id        = "get-hello"
-  api_name            = azurerm_api_management_api.api.name
-  api_management_name = azurerm_api_management.apim.name
-  resource_group_name = azurerm_resource_group.rg.name
-  display_name        = "Get Hello"
-  method              = "GET"
-  url_template        = "/"
-  response {
-    status_code  = 200
-    description = "OK"
-  }
-}
-
-resource "azurerm_api_management_api_policy" "policy" {
-  api_name            = azurerm_api_management_api.api.name
-  api_management_name = azurerm_api_management.apim.name
-  resource_group_name = azurerm_resource_group.rg.name
-
-  xml_content = <<XML
-<policies>
-    <inbound>
-        <base />
-    </inbound>
-    <backend>
-        <base />
-    </backend>
-    <outbound>
-        <base />
-    </outbound>
-</policies>
-XML
-}
+#resource "azurerm_api_management_api" "api" {
+#  name                = "mibanco-api"
+#  resource_group_name = azurerm_resource_group.rg.name
+#  api_management_name = azurerm_api_management.apim.name
+#  revision            = "1"
+#  display_name        = "Mibanco API"
+#  path                = "mibanco"
+#  protocols           = ["https"]
+#  service_url         = "https://${azurerm_api_management.apim.gateway_url}"
+#}

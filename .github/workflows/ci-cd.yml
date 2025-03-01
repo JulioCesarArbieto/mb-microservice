@@ -1,9 +1,9 @@
 name: CI/CD Pipeline
 
 on:
-  push:
-    branches:
-      - main
+  #push:
+  #  branches:
+  #    - main
   pull_request:
     branches:
       - main
@@ -47,13 +47,17 @@ jobs:
       #    tenant-id: ${{ secrets.AZURE_TENANT_ID }}
       #    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       
-      - name: Construcción y push de imagen a ACR
+      - name: Construir y subir imagen a ACR
         run: |
           az acr login --name mibancoacr
-          docker build -t mibancoacr.azurecr.io/mibanco-app:latest .
-          docker push mibancoacr.azurecr.io/mibanco-app:latest
-      
+          docker build -t mibancoacr.azurecr.io/mibanco:latest .
+          docker push mibancoacr.azurecr.io/mibanco:latest
+
       - name: Desplegar en AKS
         run: |
           az aks get-credentials --resource-group mibanco-rg --name mibanco-aks
           kubectl apply -f k8s/
+
+      - name: Registrar API en API Management
+        run: |
+          az apim api import --resource-group mibanco-rg --service-name mibanco-apim --path "mibanco" --api-id "mibanco-api" --wsdl-url "http://mibanco.local/swagger.yaml"

@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: mbmicroservice-service
+  name: mibanco-service
 spec:
   selector:
-    app: mbmicroservice
+    app: mibanco
   ports:
     - protocol: TCP
       port: 80
       targetPort: 8080
-  type: LoadBalancer # Cambiar a ClusterIP si se usará Ingress
+  type: LoadBalancer
