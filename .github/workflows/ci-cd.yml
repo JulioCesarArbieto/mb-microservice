@@ -39,7 +39,15 @@ jobs:
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-
+          
+      - name: Configurar JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      
+      - name: Compilar la aplicación
+        run: mvn clean package
       #- name: Azure login
       #  uses: azure/login@v2
       #  with:

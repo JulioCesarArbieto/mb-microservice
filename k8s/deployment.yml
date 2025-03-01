@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mbmicroservice
+  labels:
+    app: mbmicroservice
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mbmicroservice
+  template:
+    metadata:
+      labels:
+        app: mbmicroservice
+    spec:
+      containers:
+      - name: mbmicroservice
+        image: mibancoacr.azurecr.io/mbmicroservice:latest # Cambiar según la imagen
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "prod" # Cambiar según el ambiente
