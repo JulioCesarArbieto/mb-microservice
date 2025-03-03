@@ -42,7 +42,7 @@ jobs:
       - name: Verificar que el JAR fue generado
         run: |
           ls -l target/
-          
+
       - name: Login en Azure
         uses: azure/login@v1
         with:
@@ -66,6 +66,13 @@ jobs:
           az aks get-credentials --resource-group mibanco-rg --name mibanco-aks
           kubectl apply -f k8s/
 
-      - name: Registrar API en API Management
+      - name: Desplegar en AKS
         run: |
-          az apim api import --resource-group mibanco-rg --service-name mibanco-apim --path "mibanco" --api-id "mibanco-api" --wsdl-url "http://mibanco.local/swagger.yaml"
+          az aks get-credentials --resource-group mibanco-rg --name mibanco-aks
+          kubectl get namespaces
+          kubectl get pods
+          kubectl get services
+
+      #- name: Registrar API en API Management
+      #  run: |
+      #    az apim api import --resource-group mibanco-rg --service-name mibanco-apim --path "mibanco" --api-id "mibanco-api" --wsdl-url "http://mibanco.local/swagger.yaml"
