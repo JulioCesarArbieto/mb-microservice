@@ -1,0 +1,28 @@
+openapi: 3.0.0
+info:
+  title: Mibanco API
+  description: API de Mibanco para gestión de clientes y cuentas.
+  version: 1.0.0
+servers:
+  - url: https://api.mibanco.com/v1
+    description: Servidor de producción
+paths:
+  /saludo:
+    get:
+      summary: Obtiene Hola mibanco
+      operationId: obtenerMibanco
+      responses:
+        '200':
+          description: Lista de Hola mibanco
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    nombre:
+                      type: string
+ 
