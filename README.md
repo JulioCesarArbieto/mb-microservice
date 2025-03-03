@@ -37,32 +37,30 @@ public class HelloController {
 
 ## 3. Configurar Terraform para la infraestructura en Azure
 
-Crea un directorio `infra` y dentro, el archivo `main.tf` con la configuración de AKS, ACR e Ingress:
+Crea un directorio `infra` y dentro, los siguientes archivos:
+
+### `infra/main.tf`
 
 ```terraform
 provider "azurerm" {
   features {}
-  subscription_id = "xxxxxx"
-  client_id       = "xxxxxx"
-  client_secret   = "xxxxxx"
-  tenant_id       = "xxxxxx"
 }
 
 resource "azurerm_resource_group" "rg" {
-  name     = "mibanco-rg"
-  location = "East US"
+  name     = var.resource_group_name
+  location = var.location
 }
 
 resource "azurerm_kubernetes_cluster" "aks" {
   name                = "mibanco-aks"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
-  dns_prefix          = "mibancoaks"
+  dns_prefix          = "mibanco"
 
   default_node_pool {
     name       = "default"
-    node_count = 1
-    vm_size    = "Standard_DS2_v2"
+    node_count = var.aks_node_count
+    vm_size    = var.aks_vm_size
   }
 
   identity {
@@ -75,63 +73,75 @@ resource "azurerm_container_registry" "acr" {
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
   sku                 = "Basic"
-  admin_enabled       = true
 }
 
-# Azure API Management
 resource "azurerm_api_management" "apim" {
   name                = "mibanco-apim"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   publisher_name      = "Mibanco"
-  publisher_email     = "admin@mibanco.com"
-  sku_name            = "Consumption_0"
+  publisher_email     = "contacto@mibanco.com"
+  sku_name            = "Developer"
+}
+```
+
+### `infra/variables.tf`
+
+```terraform
+variable "subscription_id" {
+  description = "Azure Subscription ID"
+  type        = string
 }
 
-resource "azurerm_api_management_api" "api" {
-  name                = "mibanco-api"
-  resource_group_name = azurerm_resource_group.rg.name
-  api_management_name = azurerm_api_management.apim.name
-  revision            = "1"
-  display_name        = "Mibanco API"
-  path                = "mibanco"
-  protocols           = ["https"]
-  service_url         = "https://${azurerm_api_management.apim.gateway_url}"
+variable "client_id" {
+  description = "Azure Client ID"
+  type        = string
 }
 
-resource "azurerm_api_management_api_operation" "get_hello" {
-  operation_id        = "get-hello"
-  api_name            = azurerm_api_management_api.api.name
-  api_management_name = azurerm_api_management.apim.name
-  resource_group_name = azurerm_resource_group.rg.name
-  display_name        = "Get Hello"
-  method              = "GET"
-  url_template        = "/"
-  response {
-    status_code  = 200
-    description = "OK"
-  }
+variable "client_secret" {
+  description = "Azure Client Secret"
+  type        = string
+  sensitive   = true
 }
 
-resource "azurerm_api_management_api_policy" "policy" {
-  api_name            = azurerm_api_management_api.api.name
-  api_management_name = azurerm_api_management.apim.name
-  resource_group_name = azurerm_resource_group.rg.name
-
-  xml_content = <<XML
-<policies>
-    <inbound>
-        <base />
-    </inbound>
-    <backend>
-        <base />
-    </backend>
-    <outbound>
-        <base />
-    </outbound>
-</policies>
-XML
+variable "tenant_id" {
+  description = "Azure Tenant ID"
+  type        = string
 }
+
+variable "resource_group_name" {
+  description = "Nombre del grupo de recursos"
+  type        = string
+  default     = "mibanco-rg"
+}
+
+variable "location" {
+  description = "Ubicación de los recursos en Azure"
+  type        = string
+  default     = "East US"
+}
+
+variable "aks_node_count" {
+  description = "Cantidad de nodos en AKS"
+  type        = number
+  default     = 1
+}
+
+variable "aks_vm_size" {
+  description = "Tamaño de la VM en AKS"
+  type        = string
+  default     = "Standard_B2s"
+}
+```
+
+### `infra/terraform.tfvars`
+
+```terraform
+subscription_id = "tu-subscription-id"
+client_id       = "tu-client-id"
+client_secret   = "tu-client-secret"
+tenant_id       = "tu-tenant-id"
+location        = "East US"
 ```
 
 Inicializa Terraform y aplica los cambios:
@@ -185,7 +195,15 @@ jobs:
     steps:
       - name: Checkout código
         uses: actions/checkout@v3
-      
+
+      - name: Construir aplicación con Maven
+        run: |
+          mvn clean package -DskipTests
+
+      - name: Verificar que el JAR fue generado
+        run: |
+          ls -l target/
+
       - name: Login en Azure
         uses: azure/login@v1
         with:
@@ -198,16 +216,31 @@ jobs:
       #    tenant-id: ${{ secrets.AZURE_TENANT_ID }}
       #    subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       
-      - name: Construcción y push de imagen a ACR
+      - name: Construir y subir imagen a ACR
         run: |
           az acr login --name mibancoacr
-          docker build -t mibancoacr.azurecr.io/mibanco-app:latest .
-          docker push mibancoacr.azurecr.io/mibanco-app:latest
-      
+          docker build -t mibancoacr.azurecr.io/mibanco:latest .
+          docker push mibancoacr.azurecr.io/mibanco:latest
+
       - name: Desplegar en AKS
         run: |
           az aks get-credentials --resource-group mibanco-rg --name mibanco-aks
           kubectl apply -f k8s/
+
+      - name: Desplegar en AKS
+        run: |
+          az aks get-credentials --resource-group mibanco-rg --name mibanco-aks
+          kubectl get namespaces
+          kubectl get pods
+          kubectl get services
+          kubectl get deployments
+          kubectl get replicasets
+          kubectl get events
+          kubectl get all
+
+      #- name: Registrar API en API Management
+      #  run: |
+      #    az apim api import --resource-group mibanco-rg --service-name mibanco-apim --path "mibanco" --api-id "mibanco-api" --wsdl-url "http://mibanco.local/swagger.yaml"
 ```
 
 ## 5. Crear manifiestos de Kubernetes (`k8s/`)
@@ -219,27 +252,24 @@ Crea los siguientes archivos dentro de `k8s/`:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mbmicroservice
+  name: mibanco-app
   labels:
-    app: mbmicroservice
+    app: mibanco
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: mbmicroservice
+      app: mibanco
   template:
     metadata:
       labels:
-        app: mbmicroservice
+        app: mibanco
     spec:
       containers:
-      - name: mbmicroservice
-        image: mibancoacr.azurecr.io/mbmicroservice:latest # Cambiar según la imagen
-        ports:
-        - containerPort: 8080
-        env:
-        - name: SPRING_PROFILES_ACTIVE
-          value: "prod" # Cambiar según el ambiente
+        - name: mibanco-app
+          image: mibancoacr.azurecr.io/mibanco:latest
+          ports:
+            - containerPort: 8080
 ```
 
 **Service (`service.yml`)**:
@@ -247,37 +277,34 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: mbmicroservice-service
+  name: mibanco-service
 spec:
   selector:
-    app: mbmicroservice
+    app: mibanco
   ports:
     - protocol: TCP
       port: 80
       targetPort: 8080
-  type: LoadBalancer # Cambiar a ClusterIP si se usará Ingress
-```
+  type: LoadBalancer # Cambiar a ClusterIP 
 
 **Ingress (`ingress.yml`)**:
 ```yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: mbmicroservice-ingress
-  annotations:
-    kubernetes.io/ingress.class: "nginx"
+  name: mibanco-ingress
 spec:
   rules:
-  - host: mbmicroservice.mibanco.com # Cambiar por el dominio real
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: mbmicroservice-service
-            port:
-              number: 80
+    - host: mibanco.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mibanco-service
+                port:
+                  number: 80
 ```
 
 ## 6. Validación del despliegue
@@ -285,8 +312,14 @@ spec:
 Ejecuta:
 
 ```bash
-kubectl get pods
-kubectl get ingress
+  kubectl get namespaces
+  kubectl get pods
+  kubectl get ingress
+  kubectl get services
+  kubectl get deployments
+  kubectl get replicasets
+  kubectl get events
+  kubectl get all
 ```
 
 Prueba la aplicación con Postman o `curl`:

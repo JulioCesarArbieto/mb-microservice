@@ -1,9 +1,9 @@
 name: CI/CD Pipeline
 
 on:
-  #push:
-  #  branches:
-  #    - main
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
@@ -72,6 +72,10 @@ jobs:
           kubectl get namespaces
           kubectl get pods
           kubectl get services
+          kubectl get deployments
+          kubectl get replicasets
+          kubectl get events
+          kubectl get all
 
       #- name: Registrar API en API Management
       #  run: |
